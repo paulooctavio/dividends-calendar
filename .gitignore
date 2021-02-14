@@ -1,0 +1,6 @@
+credentials.yml
+token.pickle
+credentials.json
+.vscode
+env
+__pycache__
