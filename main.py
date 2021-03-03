@@ -1,54 +1,48 @@
-from b3_client import B3HttpClient
+from cei_client import CEIHttpClient
 from calendar_api import CalendarAPI
+from b3_client import B3HttPClient
 from configs import get_configs
-import pandas as pd
 
 
-def clean_payments_df(df):
-    df.drop_duplicates(inplace=True)
-    df["Prev. Pagamento"] = (
-        df["Prev. Pagamento"].str
-        .replace('0001', '2021')
-    )
-    df["Prev. Pagamento"] = (
-        pd.to_datetime(df["Prev. Pagamento"])
-        .dt.date
-    )
-    return df
-
-
-def get_payment_event(row):
-    asset = row["Ativo"]
-    symbol = row["Cód. Negociação"]
-    date = row["Prev. Pagamento"]
-    payment_type = row["Tipo Evento"]
-    return {
-        'summary': f'{asset} ({symbol}) - {payment_type}',
+def get_payment_event(row, owned_assets):
+    asset = row["company"]
+    code = row["code"]
+    ex_date = row["ex_date"]
+    is_owned = True if code in owned_assets else False
+    event = {
+        'summary': f'{asset} ({code})',
+        'colorId': '11' if is_owned else '9',
+        'description': 'This asset is in your wallet' if is_owned else None,
         'start': {
-            'date': str(date)
+            'date': str(ex_date)
         },
         'end': {
-            'date': str(date)
+            'date': str(ex_date)
         }
     }
+    print(event)
+    return event
 
 
-def generate_calendar(row, calendar):
-    event = get_payment_event(row)
+def generate_calendar(row, calendar, owned_assets):
+    event = get_payment_event(row, owned_assets)
     calendar.add_event(event)
 
 
 def main(configs):
-    client = B3HttpClient(
+    cei_http_client = CEIHttpClient(
         username=configs["username"],
         password=configs["password"]
     )
-    client.login()
-    payments_df = client.get_payments()
-    payments_df = clean_payments_df(payments_df)
+    cei_http_client.login()
+    owned_assets = cei_http_client.get_owned_assets()
+
+    b3_http_client = B3HttPClient()
+    payments_df = b3_http_client.get_payments()
+
     calendar = CalendarAPI()
     payments_df.apply(
-        lambda row: generate_calendar(row, calendar),
+        lambda row: generate_calendar(row, calendar, owned_assets),
         axis=1
     )
 
